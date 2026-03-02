@@ -22,3 +22,4 @@ if settings.DEBUG:
 handler404 = 'pages.views.page_404'
 handler500 = 'pages.views.page_500'
 handler403 = 'pages.views.page_403'
+
