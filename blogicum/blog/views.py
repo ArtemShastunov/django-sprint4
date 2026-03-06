@@ -1,45 +1,29 @@
-from django.conf import settings
-from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
-from django.core.paginator import Paginator
-from django.db.models import Count
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .constants import POSTS_ON_MAIN_PAGE
 from .forms import CommentForm, PostForm, ProfileForm
-from .models import Comment, Post, Category, User
-
-
-def get_filtered_posts():
-    """Возвращает опубликованные посты, видимые всем"""
-    return Post.objects.select_related(
-        'author', 'location', 'category'
-    ).filter(
-        is_published=True,
-        pub_date__lte=timezone.now(),
-        category__is_published=True
-    ).order_by('-pub_date')
-
-
-def get_posts_with_comment_count(queryset):
-    """Добавляет к постам количество комментариев"""
-    return queryset.annotate(comment_count=Count('comments'))
+from .models import Category, Comment, Post, User
+from .services import get_posts_queryset
 
 
 def index(request):
-    posts = get_filtered_posts()
-    posts = get_posts_with_comment_count(posts)
-    paginator = Paginator(posts, POSTS_ON_MAIN_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    """Главная страница с пагинацией постов."""
+    page_obj = get_posts_queryset(
+        filter_public=True,
+        annotate_comments=True,
+        paginate=True,
+        request=request
+    )
     context = {'page_obj': page_obj}
     return render(request, 'blog/index.html', context)
 
 
 def post_detail(request, post_id):
+    """Страница отдельного поста."""
     if request.user.is_authenticated:
         post = get_object_or_404(
             Post.objects.select_related('author', 'location', 'category'),
@@ -53,47 +37,44 @@ def post_detail(request, post_id):
         if not is_visible and post.author != request.user:
             raise Http404('Пост не найден')
     else:
-        post = get_object_or_404(get_filtered_posts(), pk=post_id)
+        post = get_object_or_404(
+            get_posts_queryset(filter_public=True), pk=post_id
+        )
 
     comments = post.comments.select_related('author')
-    form = CommentForm(request.POST or None)
+    form = CommentForm()
     context = {'post': post, 'form': form, 'comments': comments}
     return render(request, 'blog/detail.html', context)
 
 
 def category_posts(request, category_slug):
+    """Страница категории с пагинацией постов."""
     category = get_object_or_404(
         Category, slug=category_slug, is_published=True
     )
-    posts = get_filtered_posts().filter(category=category)
-    posts = get_posts_with_comment_count(posts)
-    paginator = Paginator(posts, POSTS_ON_MAIN_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_posts_queryset(
+        queryset=Post.objects.filter(category=category),
+        filter_public=True,
+        annotate_comments=True,
+        paginate=True,
+        request=request
+    )
     context = {'category': category, 'page_obj': page_obj}
     return render(request, 'blog/category.html', context)
 
 
 def profile(request, username):
+    """Страница профиля пользователя."""
     user = get_object_or_404(User, username=username)
+    filter_public = request.user != user
 
-    if request.user != user:
-        posts = user.posts.filter(
-            is_published=True,
-            pub_date__lte=timezone.now(),
-            category__is_published=True
-        ).select_related(
-            'category', 'location'
-        ).order_by('-pub_date')
-    else:
-        posts = user.posts.select_related(
-            'category', 'location'
-        ).order_by('-pub_date')
-
-    posts = get_posts_with_comment_count(posts)
-    paginator = Paginator(posts, POSTS_ON_MAIN_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_posts_queryset(
+        queryset=user.posts.select_related('author', 'location', 'category'),
+        filter_public=filter_public,
+        annotate_comments=True,
+        paginate=True,
+        request=request
+    )
     context = {
         'profile': user,
         'page_obj': page_obj,
@@ -102,10 +83,10 @@ def profile(request, username):
 
 
 def signup(request):
+    """Регистрация нового пользователя."""
     form = UserCreationForm(request.POST or None)
     if form.is_valid():
         user = form.save()
-        from django.contrib.auth import login
         login(request, user)
         return redirect('blog:profile', username=user.username)
     return render(
@@ -115,8 +96,9 @@ def signup(request):
     )
 
 
-@login_required(login_url=settings.LOGIN_URL)
+@login_required
 def create_post(request):
+    """Создание нового поста."""
     form = PostForm(request.POST or None, files=request.FILES or None)
     if form.is_valid():
         post = form.save(commit=False)
@@ -126,8 +108,9 @@ def create_post(request):
     return render(request, 'blog/create.html', {'form': form})
 
 
-@login_required(login_url=settings.LOGIN_URL)
+@login_required
 def edit_post(request, post_id):
+    """Редактирование поста."""
     post = get_object_or_404(Post, pk=post_id)
     if post.author != request.user:
         return redirect('blog:post_detail', post_id=post_id)
@@ -139,30 +122,29 @@ def edit_post(request, post_id):
     if form.is_valid():
         form.save()
         return redirect('blog:post_detail', post_id=post_id)
-    return render(
-        request,
-        'blog/create.html',
-        {'form': form, 'is_edit': True}
-    )
+    return render(request, 'blog/create.html', {'form': form})
 
 
-@login_required(login_url=settings.LOGIN_URL)
+@login_required
 def delete_post(request, post_id):
+    """Удаление поста."""
     post = get_object_or_404(Post, pk=post_id)
     if post.author != request.user:
         return redirect('blog:post_detail', post_id=post_id)
     if request.method == 'POST':
         post.delete()
         return redirect('blog:profile', username=request.user.username)
+    form = PostForm(instance=post)
     return render(
         request,
         'blog/create.html',
-        {'post': post, 'is_edit': True}
+        {'form': form, 'post': post}
     )
 
 
-@login_required(login_url=settings.LOGIN_URL)
+@login_required
 def add_comment(request, post_id):
+    """Добавление комментария."""
     post = get_object_or_404(Post, pk=post_id)
     form = CommentForm(request.POST or None)
     if form.is_valid():
@@ -173,8 +155,9 @@ def add_comment(request, post_id):
     return redirect('blog:post_detail', post_id=post_id)
 
 
-@login_required(login_url=settings.LOGIN_URL)
+@login_required
 def edit_comment(request, post_id, comment_id):
+    """Редактирование комментария."""
     comment = get_object_or_404(Comment, pk=comment_id)
     if comment.author != request.user:
         return redirect('blog:post_detail', post_id=post_id)
@@ -189,8 +172,9 @@ def edit_comment(request, post_id, comment_id):
     )
 
 
-@login_required(login_url=settings.LOGIN_URL)
+@login_required
 def delete_comment(request, post_id, comment_id):
+    """Удаление комментария."""
     comment = get_object_or_404(Comment, pk=comment_id)
     if comment.author != request.user:
         return redirect('blog:post_detail', post_id=post_id)
@@ -204,8 +188,9 @@ def delete_comment(request, post_id, comment_id):
     )
 
 
-@login_required(login_url=settings.LOGIN_URL)
+@login_required
 def edit_profile(request):
+    """Редактирование профиля пользователя."""
     form = ProfileForm(request.POST or None, instance=request.user)
     if form.is_valid():
         form.save()
@@ -217,8 +202,9 @@ def edit_profile(request):
     )
 
 
-@login_required(login_url=settings.LOGIN_URL)
+@login_required
 def change_password(request):
+    """Изменение пароля пользователя."""
     form = PasswordChangeForm(request.user, request.POST or None)
     if form.is_valid():
         user = form.save()

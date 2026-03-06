@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.urls import reverse
 
 from .constants import OBJECT_NAME_MAX_LENGTH
 
@@ -24,8 +25,10 @@ class Category(PublishedCreated):
     slug = models.SlugField(
         'Идентификатор',
         unique=True,
-        help_text=('Идентификатор страницы для URL; '
-                   'разрешены символы латиницы, цифры, дефис и подчёркивание.')
+        help_text=(
+            'Идентификатор страницы для URL; '
+            'разрешены символы латиницы, цифры, дефис и подчёркивание.'
+        )
     )
 
     class Meta(PublishedCreated.Meta):
@@ -52,8 +55,10 @@ class Post(PublishedCreated):
     text = models.TextField('Текст')
     pub_date = models.DateTimeField(
         'Дата и время публикации',
-        help_text=('Если установить дату и время в будущем — '
-                   'можно делать отложенные публикации.')
+        help_text=(
+            'Если установить дату и время в будущем — '
+            'можно делать отложенные публикации.'
+        )
     )
     author = models.ForeignKey(
         User,
@@ -86,16 +91,25 @@ class Post(PublishedCreated):
     def __str__(self):
         return self.title[:OBJECT_NAME_MAX_LENGTH]
 
+    def get_absolute_url(self):
+        return reverse('blog:post_detail', kwargs={'post_id': self.pk})
+
 
 class Comment(models.Model):
     text = models.TextField('Текст комментария')
     post = models.ForeignKey(
-        Post, on_delete=models.CASCADE, related_name='comments'
+        Post,
+        on_delete=models.CASCADE,
+        related_name='comments',
+        verbose_name='Пост'
     )
     author = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='comments'
+        User,
+        on_delete=models.CASCADE,
+        related_name='comments',
+        verbose_name='Автор'
     )
-    created_at = models.DateTimeField('Добавлено', auto_now_add=True)
+    created_at = models.DateTimeField('Дата добавления', auto_now_add=True)
 
     class Meta:
         ordering = ('created_at',)
@@ -103,4 +117,8 @@ class Comment(models.Model):
         verbose_name_plural = 'Комментарии'
 
     def __str__(self):
-        return self.text[:OBJECT_NAME_MAX_LENGTH]
+        return (
+            f'Комментарий "{self.text[:20]}" '
+            f'к посту "{self.post.title[:20]}" '
+            f'от {self.author.username}'
+        )

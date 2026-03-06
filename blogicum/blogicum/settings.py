@@ -88,18 +88,11 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
-# Медиа-файлы (изображения постов)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Почтовый бэкенд
 EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
 EMAIL_FILE_PATH = BASE_DIR / 'sent_emails'
-
-# Обработчики ошибок
-handler404 = 'pages.views.page_404'
-handler500 = 'pages.views.page_500'
-handler403 = 'pages.views.page_403'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
