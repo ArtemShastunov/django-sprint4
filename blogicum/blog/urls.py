@@ -36,6 +36,5 @@ urlpatterns = [
     path('profile/<str:username>/', views.profile, name='profile'),
     path('edit_profile/', views.edit_profile, name='edit_profile'),
     path('change_password/', views.change_password, name='change_password'),
-    path('auth/signup/', views.signup, name='signup'),
     path('posts/', include(posts_urls)),
 ]

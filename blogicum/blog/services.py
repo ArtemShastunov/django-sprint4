@@ -33,6 +33,8 @@ def get_posts_queryset(
     if annotate_comments:
         queryset = queryset.annotate(comment_count=Count('comments'))
 
+    queryset = queryset.order_by('-pub_date')
+
     if paginate and request is not None:
         paginator = Paginator(queryset, POSTS_ON_MAIN_PAGE)
         page_number = request.GET.get('page')
