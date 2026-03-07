@@ -96,4 +96,4 @@ EMAIL_FILE_PATH = BASE_DIR / 'sent_emails'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGIN_URL = '/auth/login/'
+LOGIN_URL = 'auth:login'

@@ -1,6 +1,8 @@
 from django import forms
+
 from django.contrib.auth import get_user_model
 
+from .constants import DATETIME_FORMAT
 from .models import Comment, Post
 
 User = get_user_model()
@@ -13,13 +15,13 @@ class PostForm(forms.ModelForm):
         widgets = {
             'pub_date': forms.DateTimeInput(
                 attrs={'type': 'datetime-local'},
-                format='%Y-%m-%dT%H:%M'
+                format=DATETIME_FORMAT
             ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['pub_date'].input_formats = ['%Y-%m-%dT%H:%M']
+        self.fields['pub_date'].input_formats = [DATETIME_FORMAT]
 
 
 class CommentForm(forms.ModelForm):

@@ -13,7 +13,6 @@ from .services import get_posts_queryset
 def index(request):
     """Главная страница с пагинацией постов."""
     page_obj = get_posts_queryset(
-        filter_public=True,
         annotate_comments=True,
         paginate=True,
         request=request
@@ -53,8 +52,7 @@ def category_posts(request, category_slug):
         Category, slug=category_slug, is_published=True
     )
     page_obj = get_posts_queryset(
-        queryset=Post.objects.filter(category=category),
-        filter_public=True,
+        queryset=category.posts.all(),
         annotate_comments=True,
         paginate=True,
         request=request
@@ -69,7 +67,7 @@ def profile(request, username):
     filter_public = request.user != user
 
     page_obj = get_posts_queryset(
-        queryset=user.posts.select_related('author', 'location', 'category'),
+        queryset=user.posts.all(),
         filter_public=filter_public,
         annotate_comments=True,
         paginate=True,

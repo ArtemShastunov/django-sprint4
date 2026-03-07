@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.urls import reverse
 
-from .constants import OBJECT_NAME_MAX_LENGTH
+from .constants import OBJECT_NAME_MAX_LENGTH, COMMENT_TEXT_MAX_LENGTH
 
 User = get_user_model()
 
@@ -118,7 +118,7 @@ class Comment(models.Model):
 
     def __str__(self):
         return (
-            f'Комментарий "{self.text[:20]}" '
-            f'к посту "{self.post.title[:20]}" '
+            f'Комментарий "{self.text[:COMMENT_TEXT_MAX_LENGTH]}" '
+            f'к посту "{self.post.title[:COMMENT_TEXT_MAX_LENGTH]}" '
             f'от {self.author.username}'
         )

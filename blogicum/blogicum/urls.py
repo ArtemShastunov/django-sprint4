@@ -6,7 +6,10 @@ from blog import views as blog_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('auth/', include('django.contrib.auth.urls')),
+    path('auth/', include(
+        ('django.contrib.auth.urls', 'auth'),
+        namespace='auth'
+    )),
     path('auth/registration/', blog_views.signup, name='registration'),
     path('', include('blog.urls', namespace='blog')),
     path('', include('pages.urls', namespace='pages')),
